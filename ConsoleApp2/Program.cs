@@ -11,46 +11,79 @@ using System.Data.SQLite;
 using System.Data;
 using System.Linq;
 using System.IO;
+using System.Threading;
+using System.Collections.Concurrent;
 
 namespace ConsoleApp2
 {
     class Program
     {
-        private static readonly string source = "https://www.etcg.de/yugioh/karten-suchmaschine/index.php";
+        private static readonly string domain = "https://www.etcg.de";
+        private static readonly string source = domain+"/yugioh/karten-suchmaschine/index.php";
         private static string cdbFile;
         private static readonly HttpClient client = new HttpClient();
         private static SQLiteConnection sqlite;
+        private static List<int> notFoundCards = new List<int>();
+        private static ConcurrentQueue<int> workQueue = new ConcurrentQueue<int>();
+        private static readonly int threadCount = 80;
 
         static void Main(string[] args)
         {
             Console.Write("Please enter Folder to cards.cdb:  ");
-            cdbFile = Console.ReadLine();
+            
+            cdbFile = checkFilePath(Console.ReadLine());
             if(cdbFile != null)
             {
-                if (!cdbFile.EndsWith(@"\cards.cdb"))
+                sqlite = new SQLiteConnection($@"Data Source={cdbFile}");
+                sqlite.Open();
+                workQueue = new ConcurrentQueue<int>(readCDBFile());
+                var threadArray = new List<Thread>();
+                for(int i = 0; i < threadCount; i++)
                 {
-                    cdbFile += @"\cards.cdb";
-                }
-                if (File.Exists(cdbFile))
-                {
-                    sqlite = new SQLiteConnection($@"Data Source={cdbFile}");
-                    sqlite.Open();
-                    foreach (int id in readCDBFile())
+                    var thread = new Thread(() =>
                     {
-                        string url = search(id);
-                        if (url != null)
+                        while (!workQueue.IsEmpty)
                         {
-                            loadContent(url, id);
+                            workQueue.TryDequeue(out int id);
+                            if (id != 0)
+                            {
+                                string url = search(id);
+                                if (url != null)
+                                {
+                                    loadContent(url, id);
+                                }
+                            }
                         }
-                    }
-                    sqlite.Close();
+                    });
+                    threadArray.Add(thread);
+                    thread.Start();
                 }
-                else
+                foreach(Thread thread in threadArray)
                 {
-                    Console.WriteLine("Invalid Path!");
+                    thread.Join();
                 }
-                Console.ReadLine();
+                sqlite.Close();
+                Console.WriteLine("finished");
             }
+            Console.ReadLine();
+        }
+
+        private static string checkFilePath(string path)
+        {
+            if (path != null)
+            {
+                path = path.Trim(new char[] { '"' }); //when the path is already in quotation marks
+                if (!path.EndsWith(@"\cards.cdb"))
+                {
+                    path += @"\cards.cdb";
+                }
+                
+                if (!File.Exists(path))
+                {
+                    path = null;
+                }
+            }
+            return path;
         }
 
         private static string search(int id, bool padding = true)
@@ -62,14 +95,13 @@ namespace ConsoleApp2
 
             if (responseUrl == source)
             {
-                //not found or two cards
-
-                //two cards?
+                //two cards for one ID?
                 if (checkTwoCards(responseHtml, out string link))
                 {
-                    responseUrl = "https://www.etcg.de"+link;
+                    Console.WriteLine($"Two cards with same ID found. I'll take the first one. ID:{id}");
+                    responseUrl = domain+link;
                 }
-                //not fond, sometimes no padding works
+                //not found, sometimes no padding works
                 else if(padding)
                 {
                     responseUrl = search(id, !padding);
@@ -78,6 +110,7 @@ namespace ConsoleApp2
                 else
                 {
                     Console.WriteLine($"Card not found. ID:{id}");
+                    notFoundCards.Add(id);
                     responseUrl = null;
                 }
             }
@@ -128,8 +161,7 @@ namespace ConsoleApp2
 
             var content = new FormUrlEncodedContent(values);
 
-            var response = await client.PostAsync(source, content);
-            return response;
+            return await client.PostAsync(source, content);
         }
 
         private static void loadContent(string url, int id, bool secondRun = false)
@@ -139,7 +171,7 @@ namespace ConsoleApp2
 
             HtmlNode cardName = doc.DocumentNode.SelectSingleNode("//div[@class='standard_content']/table//table"); //Card name
             HtmlNode cardDesc = doc.DocumentNode.SelectSingleNode("//div[@class='standard_content']/table//table[2]"); //Card description
-            if(cardDesc != null && cardName != null)
+            if (cardDesc != null && cardName != null)
             {
                 updateCDBFile(id, getHtmlText(cardName), getHtmlText(cardDesc));
             }
