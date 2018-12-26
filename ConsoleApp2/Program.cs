@@ -17,14 +17,10 @@ namespace ConsoleApp2
 {
     class Program
     {
-        private static readonly string domain = "https://www.etcg.de";
-        private static readonly string source = domain+"/yugioh/karten-suchmaschine/index.php";
         private static string cdbFile;
-        private static readonly HttpClient client = new HttpClient();
         private static SQLiteConnection sqlite;
-        private static List<int> notFoundCards = new List<int>();
         private static ConcurrentQueue<string> workQueue = new ConcurrentQueue<string>();
-        private static readonly int threadCount = 20;
+        private static readonly int threadCount = 5;
         private static readonly string wiki = "http://yugioh.wikia.com/wiki/";
 
         static void Main(string[] args)
@@ -107,14 +103,19 @@ namespace ConsoleApp2
                 HtmlWeb web = new HtmlWeb();
                 HtmlDocument doc = web.Load(convertUri(name));
 
-                HtmlNode cardName = doc.DocumentNode.SelectSingleNode("//table[@class='cardtable']//span[@lang='de']"); //Card name
-                HtmlNode cardDesc = doc.DocumentNode.SelectSingleNode("//table//td[@class='cardtablespanrow']//span[@lang='de']"); //Card description
-
-                if (cardDesc != null && cardName != null)
+                var germanText = doc.DocumentNode.SelectNodes("//span[@lang='de']");
+                bool success;
+                if (success = germanText.Count >= 2)
                 {
-                    updateCDBFileThroughName(name, getHtmlText(cardName), getHtmlText(cardDesc));
+                    HtmlNode cardName = germanText[0]; //Card name
+                    HtmlNode cardDesc = germanText[1]; //Card description
+
+                    if (success = (cardDesc != null && cardName != null))
+                    {
+                        updateCDBFileThroughName(name, getHtmlText(cardName), getHtmlText(cardDesc));
+                    }
                 }
-                else
+                if (!success)
                 {
                     Console.WriteLine($"Card not found. Name:{name}");
                 }
@@ -127,7 +128,7 @@ namespace ConsoleApp2
 
         private static string convertUri(string name)
         {
-            return new Uri(wiki+name.Replace(" ", "_").Replace("#",string.Empty)).AbsoluteUri;
+            return new Uri(wiki+name.Replace("#",string.Empty)).AbsoluteUri;
         }
 
         private static string getHtmlText(HtmlNode node, bool specialCharacters = false)
