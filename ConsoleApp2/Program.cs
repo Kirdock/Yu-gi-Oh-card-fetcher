@@ -174,7 +174,7 @@ namespace ConsoleApp2
             //HtmlNode cardDesc = doc.DocumentNode.SelectSingleNode("//div[@class='standard_content']/table//table[2]"); //Card description, not always right
             var nodes = doc.DocumentNode.SelectNodes("//div[@class='standard_content']/table//table//tr");
             int counter = 0; //counter == 2 then you have the description
-            int index = 0;
+            int index = -1;
             for(int i = 0; i < nodes.Count && counter <= 1; i++)
             {
                 if (nodes[i].SelectSingleNode(".//hr") != null)
@@ -183,7 +183,7 @@ namespace ConsoleApp2
                     index = i + 1;
                 }
             }
-            if (counter == 2)
+            if (index != -1)
             {
                 cardDesc = nodes[index];
             }
