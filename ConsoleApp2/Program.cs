@@ -172,7 +172,7 @@ namespace ConsoleApp2
             HtmlNode cardName = doc.DocumentNode.SelectSingleNode("//div[@class='standard_content']/table//table"); //Card name
             HtmlNode cardDesc = null;
             //HtmlNode cardDesc = doc.DocumentNode.SelectSingleNode("//div[@class='standard_content']/table//table[2]"); //Card description, not always right
-            var nodes = doc.DocumentNode.SelectNodes("//div[@class='standard_content']/table//table//tr");
+            var nodes = doc.DocumentNode.SelectNodes("//div[@class='standard_content']/table//table[2]//tr");
             int counter = 0; //counter == 2 then you have the description
             int index = -1;
             for(int i = 0; i < nodes.Count && counter <= 1; i++)
@@ -183,7 +183,7 @@ namespace ConsoleApp2
                     index = i + 1;
                 }
             }
-            if (index != -1)
+            if (index != -1 && index < nodes.Count)
             {
                 cardDesc = nodes[index];
             }
