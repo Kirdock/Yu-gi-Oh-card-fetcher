@@ -219,9 +219,9 @@ namespace ConsoleApp2
                 SQLiteCommand cmd = sqlite.CreateCommand();
                 cmd.CommandText = $"update texts set name=@name, desc=@desc where id=@id";
                 var test = 
-                cmd.Parameters.Add(new SqlParameter { Value = id, ParameterName = "@id", SqlDbType = SqlDbType.Int});
-                cmd.Parameters.Add(new SqlParameter { Value = name, ParameterName = "@name", SqlDbType = SqlDbType.Text });
-                cmd.Parameters.Add(new SqlParameter { Value = desc, ParameterName = "@desc", SqlDbType = SqlDbType.Text });
+                cmd.Parameters.Add(new SQLiteParameter { Value = id, ParameterName = "@id", DbType = DbType.Int32});
+                cmd.Parameters.Add(new SQLiteParameter { Value = name, ParameterName = "@name", DbType = DbType.String});
+                cmd.Parameters.Add(new SQLiteParameter { Value = desc, ParameterName = "@desc", DbType = DbType.String });
                 cmd.Prepare();
                 cmd.ExecuteNonQuery();
                 Console.WriteLine($"Card with ID={id} updated");
