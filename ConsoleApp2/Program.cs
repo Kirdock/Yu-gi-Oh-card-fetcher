@@ -105,7 +105,7 @@ namespace ConsoleApp2
 
                 var germanText = doc.DocumentNode.SelectNodes("//span[@lang='de']");
                 bool success;
-                if (success = germanText.Count >= 2)
+                if (success = germanText?.Count >= 2)
                 {
                     HtmlNode cardName = germanText[0]; //Card name
                     HtmlNode cardDesc = germanText[1]; //Card description
