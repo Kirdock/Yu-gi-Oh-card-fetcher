@@ -10,23 +10,40 @@ using System.Threading.Tasks;
 using System.Data.SQLite;
 using System.Data;
 using System.Linq;
+using System.IO;
 
 namespace ConsoleApp2
 {
     class Program
     {
         private static readonly string source = "https://www.etcg.de/yugioh/karten-suchmaschine/index.php";
-        private static readonly string cdbFile = @"C:\Users\Klaus\Downloads\ygopro_vs_links_beta_windows\ygopro_vs_links_beta\cards.cdb";
+        private static string cdbFile;
         private static readonly HttpClient client = new HttpClient();
         private static SQLiteConnection sqlite;
 
         static void Main(string[] args)
         {
-            sqlite = new SQLiteConnection($@"Data Source={cdbFile}");
-            foreach (int id in readCDBFile())
+            Console.Write("Please enter Folder to cards.cdb:  ");
+            cdbFile = Console.ReadLine();
+            if(cdbFile != null)
             {
-                string url = search(id);
-                loadContent(url, id);
+                if (!cdbFile.EndsWith("/cards.cdb"))
+                {
+                    cdbFile += "/cards.cdb";
+                }
+                if (File.Exists(cdbFile))
+                {
+                    sqlite = new SQLiteConnection($@"Data Source={cdbFile}");
+                    foreach (int id in readCDBFile())
+                    {
+                        string url = search(id);
+                        loadContent(url, id);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Invalid Path!");
+                }
             }
         }
 
@@ -98,7 +115,7 @@ namespace ConsoleApp2
                 Console.WriteLine($"Error while fetching data: {ex.Message}");
             }
             sqlite.Close();
-
+            Console.WriteLine("CDB-File loaded");
             return dt.AsEnumerable().Select(row => int.Parse(row[0].ToString())).ToArray();
         }
 
@@ -123,15 +140,15 @@ namespace ConsoleApp2
             HtmlWeb web = new HtmlWeb();
             HtmlDocument doc = web.Load(url);
 
-            HtmlNode cardName = doc.DocumentNode.SelectSingleNode("//div[@class='standard_content']/table//table"); //Kartenname
-            HtmlNode cardDesc = doc.DocumentNode.SelectSingleNode("//div[@class='standard_content']/table//table[2]"); //Beschreibung
+            HtmlNode cardName = doc.DocumentNode.SelectSingleNode("//div[@class='standard_content']/table//table"); //Card name
+            HtmlNode cardDesc = doc.DocumentNode.SelectSingleNode("//div[@class='standard_content']/table//table[2]"); //Card description
             if(cardDesc != null && cardName != null)
             {
                 updateCDBFile(id, getHtmlText(cardName), getHtmlText(cardDesc));
             }
             else
             {
-                Console.WriteLine($"Card with ID: {id} not found");
+                Console.WriteLine($"Card not found. ID:{id}");
             }
         }
 
@@ -154,11 +171,11 @@ namespace ConsoleApp2
                 SQLiteCommand cmd = sqlite.CreateCommand();
                 cmd.CommandText = $"update texts set name='{name}', desc='{desc}' where id={id}";
                 cmd.ExecuteNonQuery();
-                Console.WriteLine($"card with ID={id} updated");
+                Console.WriteLine($"Card with ID={id} updated");
             }
             catch (SQLiteException ex)
             {
-                Console.WriteLine($"Error while updating data: {ex.Message}");
+                Console.WriteLine($"Error while updating data: {ex.Message}, id:{id}, name:{name}, desc:{desc}");
             }
             sqlite.Close();
         }
