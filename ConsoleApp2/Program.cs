@@ -170,7 +170,27 @@ namespace ConsoleApp2
             HtmlDocument doc = web.Load(url);
 
             HtmlNode cardName = doc.DocumentNode.SelectSingleNode("//div[@class='standard_content']/table//table"); //Card name
-            HtmlNode cardDesc = doc.DocumentNode.SelectSingleNode("//div[@class='standard_content']/table//table[2]"); //Card description
+            HtmlNode cardDesc = null;
+            //HtmlNode cardDesc = doc.DocumentNode.SelectSingleNode("//div[@class='standard_content']/table//table[2]"); //Card description, not always right
+            var nodes = doc.DocumentNode.SelectNodes("//div[@class='standard_content']/table//table//tr");
+            int counter = 0; //counter == 2 then you have the description
+            int index = 0;
+            for(int i = 0; i < nodes.Count && counter <= 1; i++)
+            {
+                if (nodes[i].SelectSingleNode(".//hr") != null)
+                {
+                    counter++;
+                    index = i + 1;
+                }
+            }
+            if (counter == 2)
+            {
+                cardDesc = nodes[index];
+            }
+            else
+            {
+                Console.WriteLine($"Parsing-Error while loading Content. ID:{id}");
+            }
             if (cardDesc != null && cardName != null)
             {
                 updateCDBFile(id, getHtmlText(cardName), getHtmlText(cardDesc));
@@ -197,7 +217,12 @@ namespace ConsoleApp2
             try
             {
                 SQLiteCommand cmd = sqlite.CreateCommand();
-                cmd.CommandText = $"update texts set name='{name}', desc='{desc}' where id={id}";
+                cmd.CommandText = $"update texts set name=@name, desc=@desc where id=@id";
+                var test = 
+                cmd.Parameters.Add(new SqlParameter { Value = id, ParameterName = "@id", SqlDbType = SqlDbType.Int});
+                cmd.Parameters.Add(new SqlParameter { Value = name, ParameterName = "@name", SqlDbType = SqlDbType.Text });
+                cmd.Parameters.Add(new SqlParameter { Value = desc, ParameterName = "@desc", SqlDbType = SqlDbType.Text });
+                cmd.Prepare();
                 cmd.ExecuteNonQuery();
                 Console.WriteLine($"Card with ID={id} updated");
             }
