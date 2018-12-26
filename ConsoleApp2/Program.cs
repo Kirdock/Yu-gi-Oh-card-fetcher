@@ -27,23 +27,29 @@ namespace ConsoleApp2
             cdbFile = Console.ReadLine();
             if(cdbFile != null)
             {
-                if (!cdbFile.EndsWith("/cards.cdb"))
+                if (!cdbFile.EndsWith(@"\cards.cdb"))
                 {
-                    cdbFile += "/cards.cdb";
+                    cdbFile += @"\cards.cdb";
                 }
                 if (File.Exists(cdbFile))
                 {
                     sqlite = new SQLiteConnection($@"Data Source={cdbFile}");
+                    sqlite.Open();
                     foreach (int id in readCDBFile())
                     {
                         string url = search(id);
-                        loadContent(url, id);
+                        if (url != null)
+                        {
+                            loadContent(url, id);
+                        }
                     }
+                    sqlite.Close();
                 }
                 else
                 {
                     Console.WriteLine("Invalid Path!");
                 }
+                Console.ReadLine();
             }
         }
 
@@ -61,7 +67,7 @@ namespace ConsoleApp2
                 //two cards?
                 if (checkTwoCards(responseHtml, out string link))
                 {
-                    responseUrl = link;
+                    responseUrl = "https://www.etcg.de"+link;
                 }
                 //not fond, sometimes no padding works
                 else if(padding)
@@ -88,14 +94,7 @@ namespace ConsoleApp2
             HtmlDocument doc = new HtmlDocument();
             doc.LoadHtml(html);
             link = doc.DocumentNode.SelectSingleNode("//table[@class='content_index']//tr[2]/td[2]/p/a")?.Attributes["href"].Value;
-            bool result = link != null;
-
-            if (result)
-            {
-                link = "https://www.etcg.de" + link;
-            }
-
-            return result;
+            return link != null;
         }
 
         private static int[] readCDBFile()
@@ -104,7 +103,6 @@ namespace ConsoleApp2
             DataTable dt = new DataTable();
             try
             {
-                sqlite.Open();
                 SQLiteCommand cmd = sqlite.CreateCommand();
                 cmd.CommandText = "Select id from texts";
                 SQLiteDataAdapter ad = new SQLiteDataAdapter(cmd);
@@ -114,7 +112,6 @@ namespace ConsoleApp2
             {
                 Console.WriteLine($"Error while fetching data: {ex.Message}");
             }
-            sqlite.Close();
             Console.WriteLine("CDB-File loaded");
             return dt.AsEnumerable().Select(row => int.Parse(row[0].ToString())).ToArray();
         }
@@ -155,10 +152,10 @@ namespace ConsoleApp2
         private static string getHtmlText(HtmlNode node, bool specialCharacters = false)
         {
             string text = WebUtility.HtmlDecode(node.InnerText).Trim();
-            return specialCharacters ? text : removeUmlaute(text);
+            return specialCharacters ? text : removeSpecialCharacters(text);
         }
 
-        private static string removeUmlaute(string text)
+        private static string removeSpecialCharacters(string text)
         {
             return text.Replace("ä", "ae").Replace("ö", "oe").Replace("ü", "ue").Replace("ß", "ss");
         }
@@ -167,7 +164,6 @@ namespace ConsoleApp2
         {
             try
             {
-                sqlite.Open();
                 SQLiteCommand cmd = sqlite.CreateCommand();
                 cmd.CommandText = $"update texts set name='{name}', desc='{desc}' where id={id}";
                 cmd.ExecuteNonQuery();
@@ -177,7 +173,6 @@ namespace ConsoleApp2
             {
                 Console.WriteLine($"Error while updating data: {ex.Message}, id:{id}, name:{name}, desc:{desc}");
             }
-            sqlite.Close();
         }
     }
 }
